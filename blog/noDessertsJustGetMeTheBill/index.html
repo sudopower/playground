@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+</head>
+<body>
+    <input type="file" id="imgInp" />
+    <br><span id="bill"></span>
+</body>
+<script>
+    //Read image
+    function readFile(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            
+            reader.onload = function(e) {
+                ExtractText(e)
+            }
+            
+            reader.readAsDataURL(input.files[0]); // convert to base64 string
+        }
+        }
+
+        $("#imgInp").change(function() {
+            readFile(this);
+        });
+
+    function ExtractText(e){
+        Tesseract.recognize(
+                    e.target.result,
+                    'eng',
+                    { logger: m => console.log(m) }
+                    ).then(({ data: { text } }) => {
+                    console.log(text)
+                    regexStr = /(total.*)(value|bill|invoice)(.*)([0-9]*)/mi
+                    billDetails = text.match(regexStr)
+                    totalBill = billDetails[3]
+                    console.log(totalBill)
+                    document.getElementById("bill").innerText="Your total bill is " + totalBill
+                    })
+    }
+</script>
+</html>
