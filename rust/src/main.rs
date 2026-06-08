@@ -16,5 +16,17 @@ fn main() {
     println!("I can also format it using rustfmt filename");
 
     let sum = nos + 1;
-    println!("I can add nos using num1 + num2 = {}", sum)
+    println!("I can add nos using num1 + num2 = {}", sum);
+
+	printAGreeting();
+
+	printANumber(67);
+}
+
+fn printAGreeting(){
+	println!("This greeting was printed from a function")
+}
+
+fn printANumber(x i64){
+	println!("{}: This number was printed from a arg to a function",x)
 }
