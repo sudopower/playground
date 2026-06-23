@@ -41,7 +41,6 @@ func main() {
 		// Always start from the beginning so the full fixed backlog is drained.
 		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
 		kgo.FetchMaxBytes(50<<20),
-		kgo.DisableAutoCommit(),
 	)
 	if err != nil {
 		log.Fatal(err)

@@ -12,8 +12,10 @@ import (
 	"context"
 	"flag"
 	"log"
+	"strings"
 	"time"
 
+	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
 
 	"serdebench/internal/codec"
@@ -39,7 +41,10 @@ func main() {
 		kgo.DefaultProduceTopic(tp),
 		kgo.ProducerBatchMaxBytes(16<<20),
 		kgo.MaxBufferedRecords(250_000),
+		// acks=leader is plenty for a throwaway benchmark topic; disabling
+		// idempotency is required since that defaults to acks=all.
 		kgo.RequiredAcks(kgo.LeaderAck()),
+		kgo.DisableIdempotentWrite(),
 		kgo.ProducerLinger(50*time.Millisecond),
 	)
 	if err != nil {
@@ -48,6 +53,15 @@ func main() {
 	defer cl.Close()
 
 	ctx := context.Background()
+
+	// Create the topic explicitly (1 partition, RF 1) rather than racing broker
+	// auto-creation, which can fail the first produce with UNKNOWN_TOPIC.
+	adm := kadm.NewClient(cl)
+	if _, err := adm.CreateTopic(ctx, 1, 1, nil, tp); err != nil &&
+		!strings.Contains(err.Error(), "already exists") {
+		log.Printf("create topic (continuing): %v", err)
+	}
+
 	start := time.Now()
 	var produced int64
 	for i := 0; i < *n; i++ {

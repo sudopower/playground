@@ -24,6 +24,9 @@ if [ ${#FORMATS[@]} -eq 0 ]; then
 fi
 
 echo "==> config: N=$N cap=${CONSUMER_CPUS}cpu/${CONSUMER_MEM}  formats=${FORMATS[*]}"
+echo "==> building images (picks up latest code)"
+$COMPOSE build producer consumer
+
 echo "==> starting kafka"
 $COMPOSE up -d --wait kafka
 

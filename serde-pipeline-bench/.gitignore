@@ -1,0 +1,5 @@
+# macOS
+.DS_Store
+
+# pipeline run artifact
+pipeline-results.txt

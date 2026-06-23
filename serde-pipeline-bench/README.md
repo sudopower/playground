@@ -1,37 +1,26 @@
 # serde-pipeline-bench
 
-A controlled benchmark answering one question:
+A controlled benchmark for [SUD-5](https://linear.app/sudopower/issue/SUD-5)
+comparing **JSON, Protobuf, and Avro** pipelines:
 
-> **Are Protobuf pipelines much faster than JSON pipelines *because* the keys
-> are dropped from the payload (defined and ordered in the schema instead)?**
+> How much faster — and smaller — are the schema-based binary formats (Protobuf,
+> Avro) than JSON, and *why*?
 
-Short answer from the data so far: **partly — but it's "binary *and* keyless,"
-not keys alone.** This repo is built to *decompose* the win into its parts rather
-than just declare a winner.
+The original hypothesis was that Protobuf wins mainly because keys are dropped
+from the payload (defined and ordered in the schema instead). With these three
+formats we can measure the **size** of the win precisely; the "why" is
+qualitative (see [Caveats](#caveats)).
 
-Linear: [SUD-5](https://linear.app/sudopower/issue/SUD-5).
+## The three formats
 
-## The hypothesis, and how we isolate it
+| Format   | Wire   | Field identity on the wire | Schema needed to read? |
+| -------- | ------ | -------------------------- | ---------------------- |
+| json     | text   | full field names           | no                     |
+| protobuf | binary | numeric field tags         | (helps, not required)  |
+| avro     | binary | nothing (positional)       | **yes**                |
 
-"Protobuf has no keys on the wire" conflates two independent variables:
-
-| Format    | Wire   | Keys on wire        | What it isolates                       |
-| --------- | ------ | ------------------- | -------------------------------------- |
-| json      | text   | yes (full names)    | baseline                               |
-| jsonshort | text   | yes (1-char names)  | **key *length* alone** (still text)    |
-| msgpack   | binary | yes (full names)    | **the control: binary but keyed**      |
-| cbor      | binary | yes (full names)    | second binary-keyed control            |
-| protobuf  | binary | no (field tags)     | keyless binary                         |
-| avro      | binary | no (positional)     | keyless binary, no tags at all         |
-
-The logic:
-
-- **json → jsonshort** isolates how much is just *long field names* in text.
-- **json → msgpack/cbor** isolates *going binary while keeping keys*.
-- **msgpack/cbor → protobuf/avro** isolates *dropping the keys*.
-
-If "no keys" were the whole story, msgpack/cbor (binary **with** keys) would sit
-close to JSON. If they sit close to protobuf/avro, the win is *binary*, not keys.
+The progression is "how much per-field identification travels on the wire":
+full names → numeric tags → nothing. That maps directly onto both size and speed.
 
 ## What's here
 
@@ -40,7 +29,7 @@ close to JSON. If they sit close to protobuf/avro, the win is *binary*, not keys
 - `internal/codec` — one file per format behind a common interface, plus a
   round-trip correctness test (`go test ./internal/codec`).
 - `bench/` — microbenchmarks: marshal / unmarshal / round-trip, with allocs.
-- `cmd/sizes` — wire-size report (size is the variable the hypothesis is about).
+- `cmd/sizes` — wire-size report.
 - `pipeline/` — a local Kafka + **resource-capped** consumer to confirm the
   microbench result survives end-to-end under a **constant Kafka lag**.
 
@@ -64,17 +53,23 @@ the consumer starts, so every scenario drains the *same fixed backlog* under the
 *same CPU/memory cap*. Throughput is therefore directly comparable across formats.
 
 ```bash
-# all formats, 2M msgs each, consumer capped at 1 CPU / 512M
-./run-pipeline.sh
-
-# tweak the controls
-N=1000000 CONSUMER_CPUS=0.5 CONSUMER_MEM=256M ./run-pipeline.sh json protobuf
+./run-pipeline.sh                                   # json, protobuf, avro
+N=1000000 CONSUMER_CPUS=0.5 ./run-pipeline.sh json protobuf
 ```
 
 Results land in `pipeline-results.txt` (grep `RESULT`).
 
 ## Findings
 
-See [`docs/results.md`](docs/results.md) for the numbers and the running
-interpretation. [`docs/methodology.md`](docs/methodology.md) documents every
-control and the reasoning, so this repo doubles as the draft spine of the post.
+See [`docs/results.md`](docs/results.md) for numbers and interpretation, and
+[`docs/methodology.md`](docs/methodology.md) for the controls and the honest
+list of what this setup can and can't prove.
+
+## Caveats
+
+With only json / protobuf / avro, both binary formats change **two** things at
+once versus JSON — they're binary *and* they drop field names — so the raw
+numbers show *that* they're far faster, not a clean split of *how much* is "binary"
+vs "no keys". The reasoning for the split is qualitative here. See
+`docs/methodology.md` for the known measurement artifacts (e.g. our Protobuf
+encode buffer, Avro string aliasing) before quoting any number in the post.
